@@ -1,0 +1,1 @@
+cmd_Release/obj.target/index.node := g++ -o Release/obj.target/index.node -shared -pthread -rdynamic -m64  -Wl,-soname=index.node -Wl,--start-group Release/obj.target/index/Main.o -Wl,--end-group -lenet
