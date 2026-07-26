@@ -16,10 +16,6 @@ const server = new Pogtopia.Server({
     },
     server: {
         port: 17901,
-        cdn: {
-            host: "192.168.0.100",
-            url: "cache/"
-        },
         itemsDatFile: "items.dat",
     }
 })
@@ -30,18 +26,16 @@ let httpserver = http.createServer((req, res) => {
             res.writeHead(200, {"Content-Type": "text/plain"})
             return res.end(server_data)
         }
-        if (req.url.startsWith("/")) {
-            fs.readFile("." + req.url, (err, cont) => {
-                if (err) {
-                    res.writeHead(404, {"Content-Type": "text/plain"})
-                    return res.end("Not found")
-                } 
-                else {
-                    res.writeHead(200, {"Content-Type": "application/octet-stream", "Connection": "close"})
-                    return res.end(cont.buffer)
-                }
-            })
-        }
+        const file = fs.readFile(req.url.substring(1), (err, cont) => {
+            if (err) {
+                res.writeHead(404, {"Content-Type": "text/plain"})
+                return res.end("Not found")
+            } 
+            else {
+                res.writeHead(200, {"Content-Type": "application/octet-stream", "Content-Length": cont.length, "Location": `http://ubistatic-a.akamaihd.net/0098/5611842${req.url}`, "Server": "Caddy"})
+                return res.end(cont)
+            }
+        })
     }
 })
 httpserver.listen(80)
@@ -63,7 +57,7 @@ server.setHandler("receive", async (peer, packet) => {
                             uid: uid,
                             country: "LB",
                             skinColor: Pogtopia.Constants.DEFAULT_SKIN,
-                            displayName: `${data.get("requestedName")}_67`,
+                            displayName: `${data.get("requestedName")}_67 \`2(ou shii)`,
                             userID: server.availableUserID++,
                             password: "",
                             clothes: {
@@ -98,10 +92,10 @@ server.setHandler("receive", async (peer, packet) => {
                 const pSend = Pogtopia.Variant.from(
                     "OnSuperMainStartAcceptLogonHrdxs47254722215a",
                     server.items.hash,
-                    cdn.host + "/" + cdn.url,
-                    Pogtopia.Constants.OnSuperMainArgs.arg3,
-                    Pogtopia.Constants.OnSuperMainArgs.arg4,
-                    0
+                    "growtopia1.com",
+                    "cache/",
+                    "cc.cz.madkite.freedom org.aqua.gg idv.aqua.bulldog com.cih.gamecih2 com.cih.gamecih com.cih.game_cih cn.maocai.gamekiller com.gmd.speedtime org.dax.attack com.x0.strai.frep com.x0.strai.free org.cheatengine.cegui org.sbtools.gamehack com.skgames.traffikrider org.sbtoods.gamehaca com.skype.ralder org.cheatengine.cegui.xx.multi1458919170111 com.prohiro.macro me.autotouch.autotouch com.cygery.repetitouch.free com.cygery.repetitouch.pro com.proziro.zacro com.slash.gamebuster",
+                    "proto=216|choosemusic=audio/mp3/about_theme.mp3|active_holiday=6|wing_week_day=0|ubi_week_day=0|server_tick=638729041|clash_active=0|drop_lavacheck_faster=1|isPayingUser=0|usingStoreNavigation=1|enableInventoryTab=1|bigBackpack=1|",
                 )
                 peer.send(pSend)
             }
@@ -131,24 +125,48 @@ server.setHandler("receive", async (peer, packet) => {
             if(data.get("action") == "quit") {
                 await peer.disconnect("later")
             }
+            if(data.get("action") == "quit_to_exit") {
+                peer.leave()
+                peer.send(Pogtopia.TextPacket.from(3, "action|log", "msg|hi"))
+                peer.send(Pogtopia.Variant.from(
+                    "OnRequestWorldSelectMenu",
+                    `add_heading|Top Worlds|\nadd_floater|START|0|0.5|3529161471\nadd_floater|START1|0|0.5|3529161471\nadd_floater|BRBFR|0|0.5|3529161471`
+                ))
+                peer.send(Pogtopia.Variant.from(
+                    "OnConsoleMessage",
+                    `Welcome ${peer.data.displayName}`
+                ))
+            }
             if(data.get("action") == "join_request") {
                 console.log(peer.data.inventory)
-                let world = await Pogtopia.World.create(server, data.get("name").toUpperCase())
-                await peer.send(await world.serialize())
-                await peer.send(Pogtopia.TextPacket.from(3, "action|log", "msg|Opening world..."))
-                await peer.send(Pogtopia.Variant.from("OnSetCurrentWeather", 4));
-                await peer.send(Pogtopia.Variant.from(
-                    "OnSpawn",
-                    `spawn|avatar\nnetID|${peer.data.userID}\nuserID|${peer.data.userID}\ncolrect|0|0|20|30\nposXY|1600|500\nname|\`w${peer.data.displayName}\`\`\ncountry|${peer.data.country}\ninvis|0\nmstate|0\nsmstate|0\nonlineID|\ntype|local`
-                ))
-                peer.inventory()
-                peer.send(await peer.cloth_packet())
+                let world = await Pogtopia.World.create(server, data.get("name").toUpperCase()).generate
+                await peer.join(data.get("name").toUpperCase())
+                await peer.inventory()
             }
             break
         }
         case 4: {
-            if (packet.length < 50) {break}
-            //console.log(Pogtopia.TankPacket.from(packet))
+            if (packet.length < 60) {break}
+            const tank = Pogtopia.TankPacket.from(packet)
+            switch (tank.data.type) {
+                case 7: {
+                    await peer.leave()
+                }
+                case 0: {
+                    server.forEach("player", (c) => {
+                        if (c.world == peer.world) {
+                            let buffer = tank.parse()
+                            buffer.writeUint8(0, 5)
+                            buffer.writeUint8(0x80, 6)
+                            buffer.writeUint8(0x80, 7)
+                            buffer.writeFloatLE(125.0, 20)
+                            if (c.data.userID !== peer.data.userID) {
+                                c.send(buffer)
+                            }
+                        }
+                    })
+                }
+            }
             break
         }
     }
