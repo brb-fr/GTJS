@@ -50,7 +50,7 @@ server.setHandler("receive", async (peer, packet) => {
             if (data.has("requestedName")) {
                 if (!uid) return await peer.disconnect("later")
                 if (isGuest) {
-                    //await peer.fetch("db", {uid})
+                    await peer.fetch("db", {uid})
                     if (!peer.hasPlayerData()) {
                         await peer.create({
                             isGuest: isGuest,
@@ -76,7 +76,7 @@ server.setHandler("receive", async (peer, packet) => {
                             inventory: {
                                 maxSize: 18,
                                 items: [
-                                    {amount: 1, id: 0},
+                                    {amount: 1, id: 18},
                                     {amount: 1, id: 32}
                                 ]
                             }
@@ -88,6 +88,7 @@ server.setHandler("receive", async (peer, packet) => {
                     }
                 }
                 else {}
+                await peer.setOnline(true, true)
                 const cdn = server.getCDN()
                 const pSend = Pogtopia.Variant.from(
                     "OnSuperMainStartAcceptLogonHrdxs47254722215a",
@@ -98,6 +99,15 @@ server.setHandler("receive", async (peer, packet) => {
                     "proto=216|choosemusic=audio/mp3/about_theme.mp3|active_holiday=6|wing_week_day=0|ubi_week_day=0|server_tick=638729041|clash_active=0|drop_lavacheck_faster=1|isPayingUser=0|usingStoreNavigation=1|enableInventoryTab=1|bigBackpack=1|",
                 )
                 peer.send(pSend)
+                    peer.send(Pogtopia.TextPacket.from(3, "action|log", "msg|hi"))
+                    peer.send(Pogtopia.Variant.from(
+                        "OnRequestWorldSelectMenu",
+                        `add_heading|Top Worlds|\nadd_floater|START|0|0.5|3529161471\nadd_floater|START1|0|0.5|3529161471\nadd_floater|BRBFR|0|0.5|3529161471`
+                    ))
+                    peer.send(Pogtopia.Variant.from(
+                        "OnConsoleMessage",
+                        `Welcome ${peer.data.displayName}`
+                    ))
             }
             await peer.fetch("cache")
             if (data.get("action") == "enter_game") {
@@ -110,6 +120,7 @@ server.setHandler("receive", async (peer, packet) => {
                     "OnConsoleMessage",
                     `Welcome ${peer.data.displayName}`
                 ))
+
             }
             if (data.get("action") == "quitd"){
                 await peer.disconnect("later")
@@ -137,31 +148,38 @@ server.setHandler("receive", async (peer, packet) => {
                     `Welcome ${peer.data.displayName}`
                 ))
             }
-            if(data.get("action") == "join_request") {
-                console.log(peer.data.inventory)
-                let world = await Pogtopia.World.create(server, data.get("name").toUpperCase()).generate
-                await peer.join(data.get("name").toUpperCase())
+            if (data.get("action") == "join_request") {
+                // await Pogtopia.World.create(server, data.get("name").toUpperCase()).generate()   
+                await peer.join(data.get("name"))
                 await peer.inventory()
             }
-            break
         }
         case 4: {
+            if (!packet) {break}
             if (packet.length < 60) {break}
             const tank = Pogtopia.TankPacket.from(packet)
             switch (tank.data.type) {
                 case 7: {
-                    await peer.leave()
+                    peer.leave()
+                    peer.send(Pogtopia.TextPacket.from(3, "action|log", "msg|hi"))
+                    peer.send(Pogtopia.Variant.from(
+                        "OnRequestWorldSelectMenu",
+                        `add_heading|Top Worlds|\nadd_floater|START|0|0.5|3529161471\nadd_floater|START1|0|0.5|3529161471\nadd_floater|BRBFR|0|0.5|3529161471`
+                    ))
+                    peer.send(Pogtopia.Variant.from(
+                        "OnConsoleMessage",
+                        `Welcome ${peer.data.displayName}`
+                    ))
+                    break
                 }
                 case 0: {
                     server.forEach("player", (c) => {
-                        if (c.world == peer.world) {
-                            let buffer = tank.parse()
-                            buffer.writeUint8(0, 5)
-                            buffer.writeUint8(0x80, 6)
-                            buffer.writeUint8(0x80, 7)
-                            buffer.writeFloatLE(125.0, 20)
-                            if (c.data.userID !== peer.data.userID) {
-                                c.send(buffer)
+                        if (c.data.currentWorld != "EXIT") {
+                            if (c.data.currentWorld == peer.data.currentWorld) {
+                                let t = [...tank]
+                                t.data.targetNetID = c.data.connectID
+                                t.data.netID = peer.data.connectID
+                                c.send(t)
                             }
                         }
                     })
