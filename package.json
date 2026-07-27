@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "dependencies": {
     "pogtopia": "github:Syn9673/Pogtopia"
   }
