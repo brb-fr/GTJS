@@ -7,7 +7,7 @@ Growtopia server made using [Pogtopia](https://pogtopia.js.org/index.html) with 
 # Installation 
 Make sure you have node/nodejs installed with the dependencies of Pogtopia and you have entered the GTJS directory.
 
-For all platforms run `npm install syn9673/Pogtopia` beforehand.
+For all platforms, run `npm install syn9673/Pogtopia` beforehand.
 
 ## Windows:
 Make sure to disable a service to access port 80.
