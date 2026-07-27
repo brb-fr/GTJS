@@ -67,7 +67,7 @@ server.setHandler("receive", async (peer, packet) => {
                         await peer.create({
                             isGuest: isGuest,
                             uid: uid ,
-                            country:  peer.data.country,
+                            country:  data.get("country"),
                             skinColor: Pogtopia.Constants.DEFAULT_SKIN,
                             displayName: `\`8@${data.get("requestedName")}`,
                             userID: server.availableUserID++,
@@ -105,7 +105,7 @@ server.setHandler("receive", async (peer, packet) => {
                 let pSend = Pogtopia.Variant.from(
                     "OnSuperMainStartAcceptLogonHrdxs47254722215a",
                     server.items.hash,
-                    "growtopia1.com",
+                    "osgtcache.cernodile.com",
                     "cache/",
                     "cc.cz.madkite.freedom org.aqua.gg idv.aqua.bulldog com.cih.gamecih2 com.cih.gamecih com.cih.game_cih cn.maocai.gamekiller com.gmd.speedtime org.dax.attack com.x0.strai.frep com.x0.strai.free org.cheatengine.cegui org.sbtools.gamehack com.skgames.traffikrider org.sbtoods.gamehaca com.skype.ralder org.cheatengine.cegui.xx.multi1458919170111 com.prohiro.macro me.autotouch.autotouch com.cygery.repetitouch.free com.cygery.repetitouch.pro com.proziro.zacro com.slash.gamebuster",
                     "proto=216|choosemusic=audio/mp3/about_theme.mp3|active_holiday=6|wing_week_day=0|ubi_week_day=0|server_tick=638729041|clash_active=0|drop_lavacheck_faster=1|isPayingUser=0|usingStoreNavigation=1|enableInventoryTab=1|bigBackpack=1|",
@@ -114,7 +114,6 @@ server.setHandler("receive", async (peer, packet) => {
             }
             await peer.fetch("cache")
             if (data.get("action") == "enter_game") {
-                peer.send(peer.cloth_packet())
                 peer.send(Pogtopia.TextPacket.from(3, "action|log", "msg|Welcome to GTJS!"))
                 peer.send(Pogtopia.Variant.from(
                     "OnRequestWorldSelectMenu",
@@ -128,17 +127,19 @@ server.setHandler("receive", async (peer, packet) => {
             if (data.get("action") == "setSkin") {
                 peer.data.skinColor = Number(data.get("color"))
                 setTimeout(()=> {
-                    server.forEach("player", (p) => {
-                        p.send(peer.cloth_packet())
+                    server.forEach("player", async (p) => {
+                        if (p.data.currentWorld == peer.data.currentWorld) {
+                            await p.send(peer.cloth_packet())
+                        }
                     })
-                }, 30)
+                }, 250)
             }
             if (data.get("action") == "input") {
                 server.forEach("player", async (c) => {
                     if (c.data.currentWorld != "EXIT") {
                         if (c.data.currentWorld == peer.data.currentWorld) {
                             c.send(Pogtopia.Variant.from("OnTalkBubble", peer.data.connectID, data.get("text"), 0))
-                            c.send(Pogtopia.Variant.from("OnConsoleMessage", `CP:0_PL:0_OID:_CT:[W]_ \`8<\`w${peer.data.displayName}\`8> \`0${data.get("text")}`))
+                            c.send(Pogtopia.Variant.from("OnConsoleMessage", `CP:0_PL:0_OID:_CT:[W]_ \`9<\`w${peer.data.displayName}\`9> \`0${data.get("text")}`))
                         }
                     }
                 })
@@ -173,12 +174,15 @@ server.setHandler("receive", async (peer, packet) => {
             if (data.get("action") == "join_request") {
                 // await Pogtopia.World.create(server, data.get("name").toUpperCase()).generate()   
                 await peer.join(data.get("name"))
+                // await peer.send(peer.cloth_packet())
                 await peer.inventory()
                 setTimeout(()=> {
-                    server.forEach("player", (p) => {
-                        p.send(peer.cloth_packet())
+                    server.forEach("player", async (p) => {
+                        if (p.data.currentWorld == peer.data.currentWorld) {
+                            await p.send(peer.cloth_packet())
+                        }
                     })
-                }, 30)
+                }, 60)
             }
         }
         case 4: {
