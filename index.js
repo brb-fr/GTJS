@@ -3,8 +3,10 @@ import { TankPacket } from "growtopia.js"
 import Pogtopia from "pogtopia"
 import * as fs from "fs"
 import * as http from "node:http"
+
+const IP = "192.168.0.100"
 const server_data = `
-server|192.168.0.100
+server|${IP}
 loginurl|youtube.com
 port|17091
 #maint|
@@ -20,6 +22,14 @@ async function getOnlinePlayerCount() {
     return p               
 }
 
+function isPlacementBlocked(playerX, playerY, placeX, placeY) {
+    const minTileX = Math.floor(playerX / 32)
+    const maxTileX = Math.floor((playerX + 19) / 32)
+    const minTileY = Math.floor(playerY / 32)
+    const maxTileY = Math.floor((playerY + 29) / 32)
+    return (placeX >= minTileX && placeX <= maxTileX) && (placeY >= minTileY && placeY <= maxTileY)
+}
+
 const server = new Pogtopia.Server({
     db: {
         pass: "brbfr",
@@ -28,6 +38,60 @@ const server = new Pogtopia.Server({
     server: {
         port: 17091,
         itemsDatFile: "items.dat",
+    },
+    worldGenerator: async (world, width = 100, height = 60) => {
+        const tileCount = width * height
+        const tiles = []
+        const mainDoorPosition = Math.floor(Math.random() * ((width-5) - 5 + 1)) + 5
+        const BEDROCK_START_LEVEL = height - 5
+        const LAVA_START_LEVEL = height - 9
+        const DIRT_START_LEVEL = height / 3
+        let x = 0;
+        let y = 0;
+        for (let i = 0; i < tileCount; i++) {
+            if (x >= width) {
+                x = 0
+                y++
+            }
+            const tile = {
+                fg: 0,
+                bg: 0,
+                x,
+                y,
+                hitsTaken: 0
+            }
+            if (Math.random() < 0.375 && y >= LAVA_START_LEVEL && y < BEDROCK_START_LEVEL) {
+                tile.fg = 4
+                tile.bg = 14;
+            }
+            else if (y >= BEDROCK_START_LEVEL || (y === DIRT_START_LEVEL && x === mainDoorPosition)) {
+                tile.fg = 8;
+                tile.bg = 14;
+            }
+            else if (y >= DIRT_START_LEVEL && y < BEDROCK_START_LEVEL) {
+                tile.fg = 2;
+                tile.bg = 14;
+                if (Math.random() < 0.016 && y >= DIRT_START_LEVEL + 2) {
+                    tile.fg = 10
+                }
+            } 
+            else if (y === DIRT_START_LEVEL - 1 && x === mainDoorPosition) {
+                tile.fg = 6;
+                tile.label = "EXIT";
+                tile.doorDestination = "EXIT";
+                tile.isDoor = true;
+            }
+            tiles.push(tile)
+            x++
+        }
+        return {
+            name: world.data.name,
+            tiles,
+            tileCount,
+            width,
+            height,
+            playerCount: 0
+        }
     }
 })
 let httpserver = http.createServer((req, res) => {
@@ -52,26 +116,24 @@ let httpserver = http.createServer((req, res) => {
 httpserver.listen(80)
 server.setHandler("receive", async (peer, packet) => {
     let data = server.stringPacketToMap(packet)
-    console.log(peer.data)
+    //console.log(peer.data)
     const isGuest = !data.has("tankIDName")
     const uid = isGuest ? data.get("rid"): data.get("tankIDName").toLowerCase()
     console.log(`${packet.readInt32LE()}: ${data.get("action")}`)
-    console.log(data)
     switch (packet.readInt32LE()) {
         case 2: {
             if (data.has("requestedName")) {
                 //await peer.fetch("db", {uid})
                 if (!uid) return await peer.disconnect("later")
                 if (isGuest) {
-                    console.log(peer.data)
                     //if (!peer.hasPlayerData() || !peer.data.password) {
-                    if (true) {
+                    if (!peer.hasPlayerData()) {
                         await peer.create({
                             isGuest: isGuest,
                             uid: uid ,
                             country:  data.get("country"),
                             skinColor: Pogtopia.Constants.DEFAULT_SKIN,
-                            displayName: "`8@" + data.get("requestedName"),
+                            displayName: data.get("requestedName"),
                             userID: server.availableUserID++,
                             password: "",
                             clothes: {
@@ -93,17 +155,34 @@ server.setHandler("receive", async (peer, packet) => {
                                     {amount: 1, id: 18},
                                     {amount: 1, id: 32},
                                     {amount: 200, id: 2},
-                                    {amount: 200, id: 8}
+                                    {amount: 200, id: 8},
+                                    {amount: 200, id: 7},
+                                    {amount: 200, id: 6}
                                 ]
                             }
                         }, true)
                     }
                     else {
                         peer.data.displayName = `\`8@${data.get("requestedName")}`
-                        await peer.saveToCache()
+                        await peer.saveToCache() 
                     }
                 }
-                else {}
+                else {
+                    let foundPeer = null
+                    server.collections.players.find({uid: uid}).forEach((p) => {
+                        if (p.password == data.get("tankIDPassword")) {
+                            foundPeer = p
+                        }
+                    })
+                    if (!foundPeer) {
+                        await peer.send(Pogtopia.Variant.from(
+                            "OnConsoleMessage",
+                            "`4Error! `6This account is not found or the password is incorrect. If you don't have a GrowID continue without it, and go to the options menu in-game to get one!"
+                        ))
+                        break
+                    }
+                    else {}
+                }
                 await peer.setOnline(true, true)
                 const cdn = server.getCDN()
                 let pSend = Pogtopia.Variant.from(
@@ -115,10 +194,27 @@ server.setHandler("receive", async (peer, packet) => {
                     "proto=216|choosemusic=audio/mp3/about_theme.mp3|active_holiday=6|wing_week_day=0|ubi_week_day=0|server_tick=638729041|clash_active=0|drop_lavacheck_faster=1|isPayingUser=0|usingStoreNavigation=1|enableInventoryTab=1|bigBackpack=1|",
                 )
                 peer.send(pSend)
+                break
             }
             await peer.fetch("cache")
             if (data.get("action") == "growid") {
 
+            }
+            if (data.get("action") == "respawn" || data.get("action") == "respawn_spike") {
+                let world = Pogtopia.World.create(server, peer.data.currentWorld)
+                await world.fetch(false)
+                let mainDoor = {x: 0, y: 0}
+                world.data.tiles.forEach((tile) => {
+                    if (tile.fg == 6) {
+                        mainDoor.x = tile.x
+                        mainDoor.y = tile.y
+                    }
+                })
+                peer.send_multiple(Pogtopia.Variant.from({ netID: peer.data.connectID }, "OnSetFreezeState", 1), Pogtopia.Variant.from({ netID: peer.data.connectID }, "OnKilled"), Pogtopia.Variant.from({ netID: peer.data.connectID, delay: 2000 }, "OnSetPos", [
+                    (mainDoor?.x || 0 % world.data.width) * 32,
+                    (mainDoor?.y || 0 % world.data.width) * 32,
+                    ]), Pogtopia.Variant.from({ netID: peer.data.connectID, delay: 2000 }, "OnSetFreezeState", 0));
+                peer.audio("audio/teleport.wav", 2000);
             }
             if (data.get("action") == "enter_game") {
                 peer.send(Pogtopia.TextPacket.from(3, "action|log", "msg|Welcome to GTJS!"))
@@ -191,8 +287,7 @@ server.setHandler("receive", async (peer, packet) => {
             }
             if (data.get("action") == "join_request") {
                 if (peer.data.displayName.startsWith("@")) {
-                    console.log(peer.data.displayName)
-                    peer.data.displayName = "`8" + peer.data.displayName
+                    //peer.data.displayName = "`8" + peer.data.displayName
                 }
                 // await Pogtopia.World.create(server, data.get("name").toUpperCase()).generate()   
                 await peer.join(data.get("name"))
@@ -208,12 +303,12 @@ server.setHandler("receive", async (peer, packet) => {
                 }, 160)
             }
         }
+        break
         case 4: {
             if (!packet) {break}
             if (packet.length < 60) {break}
             await peer.fetch("cache")
             const tank = Pogtopia.TankPacket.from(packet)
-            console.log(tank)
             switch (tank.data.type) {
                 case 3: {
                     let world = Pogtopia.World.create(server, peer.data.currentWorld)
@@ -223,7 +318,7 @@ server.setHandler("receive", async (peer, packet) => {
                         world.data.tiles.forEach(async (tile) => {
                             if (!(tile.fg == 0 && tile.bg == 0)) {
                                 if (tile.x == tank.data.playerPunchX && tile.y == tank.data.playerPunchY) {
-                                    tile.hitsTaken += 4
+                                    tile.hitsTaken += 40
                                     let t = TankPacket.from({
                                         xPunch: tank.data.playerPunchX,
                                         yPunch: tank.data.playerPunchY,
@@ -256,6 +351,7 @@ server.setHandler("receive", async (peer, packet) => {
                         })
                     }
                     if (tank.data.itemInfo != 18) {
+                        if (isPlacementBlocked(peer.data.x, peer.data.y, tank.data.playerPunchX, tank.data.playerPunchY)) {break}
                         let t = TankPacket.from({
                             xPunch: tank.data.playerPunchX,
                             yPunch: tank.data.playerPunchY,
@@ -354,3 +450,4 @@ server.setHandler("disconnect", async (peer) => {
     peer.disconnect("now")
 })
 server.start()
+
