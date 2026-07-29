@@ -4,7 +4,7 @@ import Pogtopia from "pogtopia"
 import * as fs from "fs"
 import * as http from "node:http"
 
-const IP = "192.168.0.100"
+const IP = "100.65.162.85"
 const server_data = `
 server|${IP}
 loginurl|youtube.com
