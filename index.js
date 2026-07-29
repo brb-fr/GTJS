@@ -4,7 +4,7 @@ import Pogtopia from "pogtopia"
 import * as fs from "fs"
 import * as http from "node:http"
 
-const IP = "192.168.0.100"
+const IP = "10.150.138.231"
 const server_data = `
 server|${IP}
 loginurl|youtube.com
@@ -40,6 +40,8 @@ const server = new Pogtopia.Server({
         itemsDatFile: "items.dat",
     },
     worldGenerator: async (world, width = 100, height = 60) => {
+        width = 300
+        height = 170
         const tileCount = width * height
         const tiles = []
         const mainDoorPosition = Math.floor(Math.random() * ((width-5) - 5 + 1)) + 5
@@ -116,7 +118,6 @@ let httpserver = http.createServer((req, res) => {
 httpserver.listen(80)
 server.setHandler("receive", async (peer, packet) => {
     let data = server.stringPacketToMap(packet)
-    //console.log(peer.data)
     const isGuest = !data.has("tankIDName")
     const uid = isGuest ? data.get("rid"): data.get("tankIDName").toLowerCase()
     console.log(`${packet.readInt32LE()}: ${data.get("action")}`)
@@ -126,7 +127,6 @@ server.setHandler("receive", async (peer, packet) => {
                 //await peer.fetch("db", {uid})
                 if (!uid) return await peer.disconnect("later")
                 if (isGuest) {
-                    //if (!peer.hasPlayerData() || !peer.data.password) {
                     if (!peer.hasPlayerData()) {
                         await peer.create({
                             isGuest: isGuest,
@@ -156,8 +156,6 @@ server.setHandler("receive", async (peer, packet) => {
                                     {amount: 1, id: 32},
                                     {amount: 200, id: 2},
                                     {amount: 200, id: 8},
-                                    {amount: 200, id: 7},
-                                    {amount: 200, id: 6}
                                 ]
                             }
                         }, true)
@@ -177,7 +175,7 @@ server.setHandler("receive", async (peer, packet) => {
                     if (!foundPeer) {
                         await peer.send(Pogtopia.Variant.from(
                             "OnConsoleMessage",
-                            "`4Error! `6This account is not found or the password is incorrect. If you don't have a GrowID continue without it, and go to the options menu in-game to get one!"
+                            "`4Error! `oThis account is not found or the password is incorrect. If you don't have a GrowID continue without it, and go to the options menu in-game to get one!"
                         ))
                         break
                     }
@@ -229,6 +227,7 @@ server.setHandler("receive", async (peer, packet) => {
                 let dialog = new DialogBuilder()
                 dialog.addLabelWithIcon("GTJS", 18, "big")
                 dialog.addSpacer("small")
+                dialog.defaultColor()
                 dialog.addTextBox("Welcome to GTJS, thank you for using this open-source service!")
                 dialog.addTextBox("Github: `2https://github.com/brb-fr/GTJS")
                 dialog.addSpacer("small")
@@ -253,7 +252,7 @@ server.setHandler("receive", async (peer, packet) => {
                     if (c.data.currentWorld != "EXIT") {
                         if (c.data.currentWorld == peer.data.currentWorld) {
                             c.send(Pogtopia.Variant.from("OnTalkBubble", peer.data.connectID, data.get("text"), 0))
-                            c.send(Pogtopia.Variant.from("OnConsoleMessage", `CP:0_PL:0_OID:_CT:[W]_ \`9<\`w${peer.data.displayName}\`9> \`0${data.get("text")}`))
+                            c.send(Pogtopia.Variant.from("OnConsoleMessage", `CP:0_PL:0_OID:_CT:[W]_ \`o<\`w${peer.data.displayName}\`o> ${data.get("text")}`))
                         }
                     }
                 })
@@ -287,11 +286,9 @@ server.setHandler("receive", async (peer, packet) => {
             }
             if (data.get("action") == "join_request") {
                 if (peer.data.displayName.startsWith("@")) {
-                    //peer.data.displayName = "`8" + peer.data.displayName
+                    //peer.data.displayName = "`8" + peer.data.displayName // Dev player color => Soon
                 }
-                // await Pogtopia.World.create(server, data.get("name").toUpperCase()).generate()   
                 await peer.join(data.get("name"))
-                // await peer.send(peer.cloth_packet())
                 await peer.inventory()
                 setTimeout(async () => {
                     let pckt = peer.cloth_packet()
@@ -309,6 +306,7 @@ server.setHandler("receive", async (peer, packet) => {
             if (packet.length < 60) {break}
             await peer.fetch("cache")
             const tank = Pogtopia.TankPacket.from(packet)
+            console.log(tank)
             switch (tank.data.type) {
                 case 3: {
                     let world = Pogtopia.World.create(server, peer.data.currentWorld)
@@ -318,34 +316,64 @@ server.setHandler("receive", async (peer, packet) => {
                         world.data.tiles.forEach(async (tile) => {
                             if (!(tile.fg == 0 && tile.bg == 0)) {
                                 if (tile.x == tank.data.playerPunchX && tile.y == tank.data.playerPunchY) {
-                                    tile.hitsTaken += 40
-                                    let t = TankPacket.from({
-                                        xPunch: tank.data.playerPunchX,
-                                        yPunch: tank.data.playerPunchY,
-                                        info: tile.hitsTaken,
-                                        type: 8,
-                                        netID: peer.data.connectID
-                                    })
-                                    if (tile.hitsTaken >= 12) {
-                                        t.data.type = 3
-                                        t.data.info = 18
-                                        tile.hitsTaken = 0
-                                        tile.resetAfter = 0
-                                        if (tile.fg == 0) {
-                                            tile.bg = 0
-                                        }
-                                        else {
-                                            tile.fg = 0
-                                        }
-                                    }
-                                    await world.saveToCache()
-                                    server.forEach("player", (c) => {
-                                        if (c.data.currentWorld != "EXIT") {
-                                            if (c.data.currentWorld == peer.data.currentWorld) {
-                                                peer.send(t.parse())
+                                    if (!(tile.fg == 6 || tile.fg == 8)) {
+                                        tile.hitsTaken += 40
+                                        let destroyedItemID = 0
+                                        let t = TankPacket.from({
+                                            xPunch: tank.data.playerPunchX,
+                                            yPunch: tank.data.playerPunchY,
+                                            info: tile.hitsTaken,
+                                            type: 8,
+                                            netID: peer.data.connectID
+                                        })
+                                        if (tile.hitsTaken >= 12) {
+                                            t.data.type = 3
+                                            t.data.info = 18
+                                            tile.hitsTaken = 0
+                                            tile.resetAfter = 0
+                                            if (tile.fg == 0) {
+                                                destroyedItemID = tile.bg
+                                                tile.bg = 0
+                                            }
+                                            else {
+                                                destroyedItemID = tile.fg
+                                                tile.fg = 0  
                                             }
                                         }
-                                    })
+                                        await world.saveToCache()
+                                        server.forEach("player", (c) => {
+                                            if (c.data.currentWorld != "EXIT") {
+                                                if (c.data.currentWorld == peer.data.currentWorld) {
+                                                    peer.send(t.parse())
+                                                }
+                                            }
+                                        })
+                                        const rand = Math.random()
+                                        let tp = TankPacket.from({
+                                            type: 14,
+                                            netID: -1,
+                                            targetNetID: -1,
+                                            info: destroyedItemID + 1,
+                                            xPos: Math.floor((tank.data.playerPunchX * 32) + 8 + (Math.random() * (16) - 8)),
+                                            yPos: Math.floor((tank.data.playerPunchY * 32) + 8 + (Math.random() * (16) - 8)),
+                                        })
+                                        let buffer = tp.parse()
+                                        buffer.writeFloatLE(1, 20)
+                                        // TODO: Add full dropping items support
+                                        //world.data.droppedItems.push({
+                                            //id: destroyedItemID,
+                                            
+                                        //})
+                                        peer.send(buffer)
+                                    }
+                                    else if (tile.fg == 6){
+                                        peer.send(Pogtopia.Variant.from("OnTalkBubble", peer.data.connectID, "(stand over and punch to use)", 0, 1))
+                                        peer.audio("audio/cant_place_tile.wav")
+                                    }
+                                    else if (tile.fg == 8){
+                                        peer.send(Pogtopia.Variant.from("OnTalkBubble", peer.data.connectID, "It's too strong to break", 0, 1))
+                                        peer.audio("audio/cant_place_tile.wav")
+                                    }
                                 }
                             }
                         })
@@ -381,7 +409,6 @@ server.setHandler("receive", async (peer, packet) => {
                                 }
                             }
                         })
-
                     }
                     break
                 }
