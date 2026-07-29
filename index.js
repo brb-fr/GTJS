@@ -4,7 +4,7 @@ import Pogtopia from "pogtopia"
 import * as fs from "fs"
 import * as http from "node:http"
 
-const IP = "10.150.138.231"
+const IP = "192.168.0.100"
 const server_data = `
 server|${IP}
 loginurl|youtube.com
@@ -40,8 +40,8 @@ const server = new Pogtopia.Server({
         itemsDatFile: "items.dat",
     },
     worldGenerator: async (world, width = 100, height = 60) => {
-        width = 300
-        height = 170
+        width = 100
+        height = 60
         const tileCount = width * height
         const tiles = []
         const mainDoorPosition = Math.floor(Math.random() * ((width-5) - 5 + 1)) + 5
@@ -298,6 +298,22 @@ server.setHandler("receive", async (peer, packet) => {
                         }
                     })
                 }, 160)
+                let world = Pogtopia.World.create(server, data.get("name").toUpperCase())
+                await world.fetch(false)
+                let items = world.data.droppedItems || []
+                items.forEach(async (item) => {
+                    let tp = TankPacket.from({
+                        type: 14,
+                        netID: -1,
+                        targetNetID: -1,
+                        info: item.id,
+                        xPos: item.x,
+                        yPos: item.y
+                    })
+                    let buffer = tp.parse()
+                    buffer.writeFloatLE(item.amount, 20)
+                    await peer.send(buffer)
+                })
             }
         }
         break
@@ -349,22 +365,28 @@ server.setHandler("receive", async (peer, packet) => {
                                             }
                                         })
                                         const rand = Math.random()
+                                        let dItems = world.data.droppedItems  || []
+                                        const xPos = Math.floor((tank.data.playerPunchX * 32) + 8 + (Math.random() * (16) - 8))
+                                        const yPos = Math.floor((tank.data.playerPunchY * 32) + 8 + (Math.random() * (16) - 8))
                                         let tp = TankPacket.from({
                                             type: 14,
                                             netID: -1,
                                             targetNetID: -1,
                                             info: destroyedItemID + 1,
-                                            xPos: Math.floor((tank.data.playerPunchX * 32) + 8 + (Math.random() * (16) - 8)),
-                                            yPos: Math.floor((tank.data.playerPunchY * 32) + 8 + (Math.random() * (16) - 8)),
+                                            xPos,
+                                            yPos
                                         })
                                         let buffer = tp.parse()
                                         buffer.writeFloatLE(1, 20)
-                                        // TODO: Add full dropping items support
-                                        //world.data.droppedItems.push({
-                                            //id: destroyedItemID,
-                                            
-                                        //})
-                                        peer.send(buffer)
+                                        dItems.push({
+                                            id: destroyedItemID + 1,
+                                            x: xPos,
+                                            y: yPos,
+                                            amount: 1
+                                        })
+                                        //world.data.droppedItems = dItems
+                                        //await world.saveToCache()
+                                        //peer.send(buffer)
                                     }
                                     else if (tile.fg == 6){
                                         peer.send(Pogtopia.Variant.from("OnTalkBubble", peer.data.connectID, "(stand over and punch to use)", 0, 1))
