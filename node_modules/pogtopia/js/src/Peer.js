@@ -70,9 +70,9 @@ module.exports = class Peer {
       {},
       this.data
     )
-
-    data.displayName = data.displayName.replace(/`.|`/g, '')
-
+    if (this.data.displayName) {
+       data.displayName = data.displayName.replace(/`.|`/g, '')
+    }
     await this.server.collections.players.replaceOne({ userID: data.userID }, data, { upsert: true });
   }
 
@@ -400,4 +400,4 @@ smstate|0`))
   isConnected() {
     return Native.isConnected(this.data.connectID)
   }
-}
+} 

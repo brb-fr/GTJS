@@ -24,8 +24,8 @@ After that, install node-gyp by doing
 `$ npm install node-gyp -g`  
 
 After installing everything (windows or linux), simply run  
-`$ npm install pogtopia` to install the latest version on NPM, or  
-`$ npm install Alexander9673/Pogtopia` to install the version on Github.
+`$ npm install brb-fr/pogtopia` to install the latest version on NPM, or  
+
 
 ## Example
 ```js
@@ -69,5 +69,5 @@ public keys: (pattern: string) => string[]
 ```  
 If you are wondering why the return type for `get` is `any`, it's because the value can be anything from js objects, to js arrays. Anything that can be parsed from a JSON string is converted.
 
-## Questions
-Join our **[Discord Server](https://discord.gg/S7WKAeh)** about questions.
+## About fork
+This fork was made for [GTJS](https://github.com/brb-fr/GTJS), it adds additional features to Pogtopia!

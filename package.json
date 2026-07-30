@@ -2,6 +2,6 @@
   "type": "module",
   "dependencies": {
     "growtopia.js": "^2.2.0",
-    "pogtopia": "github:Syn9673/Pogtopia"
+    "pogtopia": "github:brb-fr/Pogtopia"
   }
 }

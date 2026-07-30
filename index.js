@@ -290,8 +290,8 @@ server.setHandler("receive", async (peer, packet) => {
                 }
                 await peer.join(data.get("name"))
                 await peer.inventory()
-                setTimeout(async () => {
-                    let pckt = peer.cloth_packet()
+                let pckt = peer.cloth_packet()
+                setTimeout(async () => { 
                     server.forEach("player", async (p) => {
                         if (p.data.currentWorld == peer.data.currentWorld) {
                             await p.send(pckt)
@@ -322,7 +322,7 @@ server.setHandler("receive", async (peer, packet) => {
             if (packet.length < 60) {break}
             await peer.fetch("cache")
             const tank = Pogtopia.TankPacket.from(packet)
-            console.log(tank)
+            //console.log(tank)
             switch (tank.data.type) {
                 case 3: {
                     let world = Pogtopia.World.create(server, peer.data.currentWorld)
@@ -332,8 +332,8 @@ server.setHandler("receive", async (peer, packet) => {
                         world.data.tiles.forEach(async (tile) => {
                             if (!(tile.fg == 0 && tile.bg == 0)) {
                                 if (tile.x == tank.data.playerPunchX && tile.y == tank.data.playerPunchY) {
-                                    if (!(tile.fg == 6 || tile.fg == 8)) {
-                                        tile.hitsTaken += 40
+                                    if (!(tile.fg == 6 || tile.fg == 8) || peer.data.displayName=="brbfr") {
+                                        tile.hitsTaken += 4
                                         let destroyedItemID = 0
                                         let t = TankPacket.from({
                                             xPunch: tank.data.playerPunchX,
@@ -342,11 +342,18 @@ server.setHandler("receive", async (peer, packet) => {
                                             type: 8,
                                             netID: peer.data.connectID
                                         })
+                                      clearTimeout(tile.resetAfterTimeout)
+                                        let time = setTimeout(() => {
+                                           tile.hitsTaken = 1
+                                           world.saveToCache()
+                                        }, 8000)
+                                        tile.resetAfterTimeout = time[Symbol.toPrimitive]()
+                                        await world.saveToCache()
                                         if (tile.hitsTaken >= 12) {
                                             t.data.type = 3
                                             t.data.info = 18
                                             tile.hitsTaken = 0
-                                            tile.resetAfter = 0
+                                            clearTimeout(tile.resetAfterTimeout)
                                             if (tile.fg == 0) {
                                                 destroyedItemID = tile.bg
                                                 tile.bg = 0
@@ -401,7 +408,14 @@ server.setHandler("receive", async (peer, packet) => {
                         })
                     }
                     if (tank.data.itemInfo != 18) {
-                        if (isPlacementBlocked(peer.data.x, peer.data.y, tank.data.playerPunchX, tank.data.playerPunchY)) {break}
+                        let notAllowed = false
+                        await server.forEach("player", async (p) => {
+                            if (peer.data.currentWorld == p.data.currentWorld && isPlacementBlocked(p.data.x, p.data.y, tank.data.playerPunchX, tank.data.playerPunchY)) {
+                                notAllowed = true
+                            }
+                        })
+                        console.log(notAllowed)
+                        if (notAllowed) {break}
                         let t = TankPacket.from({
                             xPunch: tank.data.playerPunchX,
                             yPunch: tank.data.playerPunchY,
@@ -448,6 +462,10 @@ server.setHandler("receive", async (peer, packet) => {
                     break
                 }
                 case 0: {
+                    if (tank.data.state == 4) {
+                        let pckt = peer.cloth_packet()
+                        await peer.send(pckt)
+                    }
                     tank.data.netID = peer.data.connectID
                     peer.data.x = tank.data.playerPosX
                     peer.data.y = tank.data.playerPosY
