@@ -112,14 +112,12 @@ const server = new Pogtopia.Server({
         itemsDatFile: "items.dat",
     },
     worldGenerator: async (world, width = 100, height = 60) => {
-        width = 26
-        height = 18
         const tileCount = width * height
         const tiles = []
         const mainDoorPosition = Math.floor(Math.random() * ((width-5) - 5 + 1)) + 5
         const BEDROCK_START_LEVEL = height - 5
         const LAVA_START_LEVEL = height - 9
-        const DIRT_START_LEVEL = height / 3
+        const DIRT_START_LEVEL = Number(height / 3)
         let x = 0;
         let y = 0;
         for (let i = 0; i < tileCount; i++) {
@@ -138,22 +136,22 @@ const server = new Pogtopia.Server({
                 tile.fg = 4
                 tile.bg = 14;
             }
-            else if (y >= BEDROCK_START_LEVEL || (y === DIRT_START_LEVEL && x === mainDoorPosition)) {
-                tile.fg = 8;
-                tile.bg = 14;
-            }
-            else if (y >= DIRT_START_LEVEL && y < BEDROCK_START_LEVEL) {
+            if (y >= DIRT_START_LEVEL && y < BEDROCK_START_LEVEL) {
                 tile.fg = 2;
                 tile.bg = 14;
                 if (Math.random() < 0.016 && y >= DIRT_START_LEVEL + 2) {
                     tile.fg = 10
                 }
             } 
-            else if (y === DIRT_START_LEVEL - 1 && x === mainDoorPosition) {
+            if (y === DIRT_START_LEVEL - 1 && x === mainDoorPosition) {
                 tile.fg = 6;
                 tile.label = "EXIT";
                 tile.doorDestination = "EXIT";
                 tile.isDoor = true;
+            }
+            if (y >= BEDROCK_START_LEVEL || (y === DIRT_START_LEVEL && x === mainDoorPosition)) {
+                tile.fg = 8;
+                tile.bg = 14;
             }
             tiles.push(tile)
             x++
@@ -521,7 +519,7 @@ server.setHandler("receive", async (peer, packet) => {
                         server.forEach("player", (c) => {
                             if (c.data.currentWorld != "EXIT") {
                                 if (c.data.currentWorld == peer.data.currentWorld) {
-                                    peer.send(t.parse())
+                                    c.send(t.parse())
                                 }
                             }
                         })
