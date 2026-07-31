@@ -482,7 +482,7 @@ interface DroppedItem {
   y: number
 
   /**
-   * The quantity of item dropped
+   * The quantity of the item dropped
    */
   amount: number
 
@@ -490,6 +490,10 @@ interface DroppedItem {
    * The dropped item
    */
   id: number
+  /**
+   * The identification number of the dropped item
+   */
+  uid: number
 }
 
 /**
