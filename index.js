@@ -3,6 +3,7 @@ import { TankPacket } from "growtopia.js"
 import Pogtopia from "pogtopia"
 import * as fs from "fs"
 import * as http from "node:http"
+import { readFileSync } from "node:fs"
 
 const IP = "100.65.162.85"
 const server_data = `
@@ -13,7 +14,77 @@ port|17091
 meta|ignoremeta
 RTENDMARKERBS1001
 `
-
+let file = readFileSync("./items.dat")
+let items = [{
+    "audioVolume": 400,
+    "breakHits": 24,
+    "canPlayerSit": false,
+    "clothingType": 0,
+    "collisionType": 0,
+    "description": "No info.",
+    "extraFieldUnk_4": "",
+    "extraFile": "",
+    "extraFileHash": 0,
+    "extraOptions": "",
+    "extraOptions2": "",
+    "growTime": 0,
+    "hitSoundType": 0,
+    "isRayman": 0,
+    "isStripeyWallpaper": 0,
+    "itemCategory": 17,
+    "itemID": 0,
+    "itemKind": 0,
+    "itemProps1": 20,
+    "itemProps2": -123,
+    "maxAmount": 200,
+    "mods": 0,
+    "name": "Blank",
+    "newInt1": 0,
+    "newInt2": 0,
+    "newValue": 0,
+    "newValue1": 9,
+    "newValue2": 9,
+    "newValue3": 9,
+    "newValue4": 9,
+    "newValue5": 9,
+    "newValue6": 9,
+    "newValue7": 9,
+    "newValue8": 9,
+    "newValue9": 9,
+    "petAbility": "",
+    "petName": "",
+    "petPrefix": "",
+    "petSuffix": "",
+    "punchOptions": "",
+    "rarity": 1,
+    "restoreTime": 8,
+    "seedBase": 0,
+    "seedColor": -1,
+    "seedOverlay": 0,
+    "seedOverlayColor": -1,
+    "sitOverlayOffsetX": 0,
+    "sitOverlayOffsetY": 0,
+    "sitOverlayTexture": "",
+    "sitOverlayX": 0,
+    "sitOverlayY": 0,
+    "sitPlayerOffsetX": 0,
+    "sitPlayerOffsetY": 0,
+    "spreadType": 1,
+    "texture": "tiles_page1.rttex",
+    "texture2": "",
+    "textureHash": 91467596,
+    "textureX": 16,
+    "textureY": 1,
+    "treeBase": 0,
+    "treeLeaves": 0,
+    "unkValueShort1": 0,
+    "unkValueShort2": 0,
+    "val1": -1,
+    "val2": 0,
+    "value": 0,
+    "value2": 0
+}]
+items = JSON.parse(fs.readFileSync("items.json", "utf-8")).items
 async function getOnlinePlayerCount() {
     let p = 0
     await server.forEach("player", () => {
@@ -21,6 +92,7 @@ async function getOnlinePlayerCount() {
     })
     return p               
 }
+
 
 function isPlacementBlocked(playerX, playerY, placeX, placeY) {
     const minTileX = Math.floor(playerX / 32)
@@ -40,8 +112,8 @@ const server = new Pogtopia.Server({
         itemsDatFile: "items.dat",
     },
     worldGenerator: async (world, width = 100, height = 60) => {
-        width = 100
-        height = 60
+        width = 26
+        height = 18
         const tileCount = width * height
         const tiles = []
         const mainDoorPosition = Math.floor(Math.random() * ((width-5) - 5 + 1)) + 5
@@ -329,27 +401,42 @@ server.setHandler("receive", async (peer, packet) => {
                     await world.fetch(false)
                     if (tank.data.itemInfo == 32) {break}
                     if (tank.data.itemInfo == 18) {
-                        world.data.tiles.forEach(async (tile) => {
+                        world.data.tiles.forEach(async (tile, index) => {
                             if (!(tile.fg == 0 && tile.bg == 0)) {
                                 if (tile.x == tank.data.playerPunchX && tile.y == tank.data.playerPunchY) {
                                     if (!(tile.fg == 6 || tile.fg == 8) || peer.data.displayName=="brbfr") {
-                                        tile.hitsTaken += 4
+                                        let item = items[0]
+                                        items.forEach((itemD)=> {
+                                            if (tile.fg == 0) {
+                                                if (itemD.id == tile.bg) {
+                                                    item = itemD
+                                                }
+                                            }
+                                            else {
+                                                if (itemD.id == tile.fg) {
+                                                    item = itemD
+                                                }         
+                                            }
+                                        })
+                                        console.log(item)
+                                        tile.hitsTaken += 6
                                         let destroyedItemID = 0
                                         let t = TankPacket.from({
                                             xPunch: tank.data.playerPunchX,
                                             yPunch: tank.data.playerPunchY,
                                             info: tile.hitsTaken,
                                             type: 8,
-                                            netID: peer.data.connectID
+                                            netID: peer.data.connectID,
                                         })
-                                      clearTimeout(tile.resetAfterTimeout)
-                                        let time = setTimeout(() => {
-                                           tile.hitsTaken = 1
-                                           world.saveToCache()
-                                        }, 8000)
+                                        clearTimeout(tile.resetAfterTimeout)
+                                        let time = setTimeout(async (idx) => {
+                                            await world.fetch(false)
+                                            world.data.tiles[idx].hitsTaken = 0
+                                            await world.saveToCache()
+                                        }, item.restoreTime * 1000, index)
                                         tile.resetAfterTimeout = time[Symbol.toPrimitive]()
                                         await world.saveToCache()
-                                        if (tile.hitsTaken >= 12) {
+                                        if (tile.hitsTaken >= item.breakHits) {
                                             t.data.type = 3
                                             t.data.info = 18
                                             tile.hitsTaken = 0
@@ -367,7 +454,7 @@ server.setHandler("receive", async (peer, packet) => {
                                         server.forEach("player", (c) => {
                                             if (c.data.currentWorld != "EXIT") {
                                                 if (c.data.currentWorld == peer.data.currentWorld) {
-                                                    peer.send(t.parse())
+                                                    c.send(t.parse())
                                                 }
                                             }
                                         })
@@ -400,7 +487,7 @@ server.setHandler("receive", async (peer, packet) => {
                                         peer.audio("audio/cant_place_tile.wav")
                                     }
                                     else if (tile.fg == 8){
-                                        peer.send(Pogtopia.Variant.from("OnTalkBubble", peer.data.connectID, "It's too strong to break", 0, 1))
+                                        peer.send(Pogtopia.Variant.from("OnTalkBubble", peer.data.connectID, "It's too strong to break.", 0, 1))
                                         peer.audio("audio/cant_place_tile.wav")
                                     }
                                 }
