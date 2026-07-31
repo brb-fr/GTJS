@@ -292,7 +292,7 @@ server.setHandler("receive", async (peer, packet) => {
                 ))
                 peer.send(Pogtopia.Variant.from(
                     "OnConsoleMessage",
-                    `Welcome ${peer.data.displayName} \`w(${await getOnlinePlayerCount()} online)`
+                    `Where would you like to go? \`w(${await getOnlinePlayerCount()} online)`
                 ))
                 let dialog = new DialogBuilder()
                 dialog.addLabelWithIcon("GTJS", 18, "big")
@@ -351,7 +351,7 @@ server.setHandler("receive", async (peer, packet) => {
                 ))
                 peer.send(Pogtopia.Variant.from(
                     "OnConsoleMessage", 
-                    `Welcome ${peer.data.displayName} \`w(${await getOnlinePlayerCount()} online)`
+                    `Where would you like to go? \`w(${await getOnlinePlayerCount()} online)`
                 ))
             }
             if (data.get("action") == "join_request") {
@@ -360,14 +360,6 @@ server.setHandler("receive", async (peer, packet) => {
                 }
                 await peer.join(data.get("name"))
                 await peer.inventory()
-                let pckt = peer.cloth_packet()
-                setTimeout(async () => { 
-                    server.forEach("player", async (p) => {
-                        if (p.data.currentWorld == peer.data.currentWorld) {
-                            await p.send(pckt)
-                        }
-                    })
-                }, 160)
                 let world = Pogtopia.World.create(server, data.get("name").toUpperCase())
                 await world.fetch(false)
                 let items = world.data.droppedItems || []
@@ -392,7 +384,7 @@ server.setHandler("receive", async (peer, packet) => {
             if (packet.length < 60) {break}
             await peer.fetch("cache")
             const tank = Pogtopia.TankPacket.from(packet)
-            //console.log(tank)
+            console.log(tank)
             switch (tank.data.type) {
                 case 3: {
                     let world = Pogtopia.World.create(server, peer.data.currentWorld)
@@ -534,7 +526,7 @@ server.setHandler("receive", async (peer, packet) => {
                     ))
                     peer.send(Pogtopia.Variant.from(
                         "OnConsoleMessage",
-                        `Welcome ${peer.data.displayName} \`w(${await getOnlinePlayerCount()} online)`
+                        `Where would you like to go? \`w(${await getOnlinePlayerCount()} online)`
                     ))
                     peer.saveToCache()
                     break
@@ -542,7 +534,12 @@ server.setHandler("receive", async (peer, packet) => {
                 case 0: {
                     if (tank.data.state == 4) {
                         let pckt = peer.cloth_packet()
-                        await peer.send(pckt)
+                        server.forEach("player", async (p) => {
+                            if (p.data.currentWorld == peer.data.currentWorld) {
+                                await peer.send(p.cloth_packet())
+                                await p.send(pckt)
+                            }
+                        })
                     }
                     tank.data.netID = peer.data.connectID
                     peer.data.x = tank.data.playerPosX
@@ -557,16 +554,38 @@ server.setHandler("receive", async (peer, packet) => {
                     })
                     break
                 }
-                case 17: {
+                case 18: {
                     server.forEach("player", async (c) => {
                         if (c.data.currentWorld != "EXIT" && c.data.connectID != peer.data.connectID) {
                             if (c.data.currentWorld == peer.data.currentWorld) {
-                                c.send(Pogtopia.Variant.from("OnTalkBubble", peer.data.connectID, "<p>..."))
+                                c.send(tank)
                             }
                         }
                     })
+                    break
                 }
-                break
+                case 26: {
+                    peer.data.currentWorld = "EXIT"
+                    peer.data.x = -1
+                    peer.data.y = -1
+                    await peer.saveToCache()
+                    server.forEach(
+                        'player',
+                        async (eachPeer) => {
+                        if (eachPeer.data.currentWorld === peer.data.currentWorld &&
+                            eachPeer.data.connectID !== peer.data.connectID)
+                            await eachPeer.send(
+                            Pogtopia.Variant.from(
+                                'OnRemove',
+                                `netID|${peer.data.connectID}`
+                            )
+                        )
+                    }
+                    )
+                    peer.disconnect("now") 
+                    break
+                }
+                
             }
             break
         }
@@ -579,6 +598,7 @@ server.setHandler("disconnect", async (peer) => {
     peer.data.currentWorld = "EXIT"
     peer.data.x = -1
     peer.data.y = -1
+    await peer.saveToCache()
     server.forEach(
         'player',
         async (eachPeer) => {
