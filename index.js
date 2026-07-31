@@ -405,20 +405,13 @@ server.setHandler("receive", async (peer, packet) => {
                             if (!(tile.fg == 0 && tile.bg == 0)) {
                                 if (tile.x == tank.data.playerPunchX && tile.y == tank.data.playerPunchY) {
                                     if (!(tile.fg == 6 || tile.fg == 8) || peer.data.displayName=="brbfr") {
-                                        let item = items[0]
-                                        items.forEach((itemD)=> {
-                                            if (tile.fg == 0) {
-                                                if (itemD.id == tile.bg) {
-                                                    item = itemD
-                                                }
-                                            }
-                                            else {
-                                                if (itemD.id == tile.fg) {
-                                                    item = itemD
-                                                }         
-                                            }
-                                        })
-                                        console.log(item)
+                                        let item = {}
+                                        if (tile.fg == 0) {
+                                            item = items[tile.bg]
+                                        }
+                                        else {
+                                            item = items[tile.fg]  
+                                        }
                                         tile.hitsTaken += 6
                                         let destroyedItemID = 0
                                         let t = TankPacket.from({
@@ -436,7 +429,7 @@ server.setHandler("receive", async (peer, packet) => {
                                         }, item.restoreTime * 1000, index)
                                         tile.resetAfterTimeout = time[Symbol.toPrimitive]()
                                         await world.saveToCache()
-                                        if (tile.hitsTaken >= item.breakHits) {
+                                        if (tile.hitsTaken >= (item.breakHits)) {
                                             t.data.type = 3
                                             t.data.info = 18
                                             tile.hitsTaken = 0
