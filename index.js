@@ -5,7 +5,7 @@ import * as fs from "fs"
 import * as http from "node:http"
 import { readFileSync } from "node:fs"
 
-const IP = "100.65.162.85"
+const IP = "100.80.80.65"
 const server_data = `
 server|${IP}
 loginurl|youtube.com
@@ -93,11 +93,13 @@ async function getOnlinePlayerCount() {
     return p               
 }
 
-function getRandomWorlds() {
+async function getRandomWorlds() {
     let worlds = new Map()
-    server.forEach("player", (p) => {
+    server.forEach("player", async (p) => {
         if (p.data.currentWorld != "EXIT" && p.data.currentWorld != "") {
-            worlds.set(p.data.currentWorld, worlds.has(p.data.currentWorld) ? worlds.get(p.data.currentWorld) : 0)
+            let w = Pogtopia.World.create(server, p.data.currentWorld)
+            w.fetch(false)
+            worlds.set(p.data.currentWorld, w.data.playerCount)
         }
     })
     let sorted = Object.entries(worlds).sort((a, b) => b[1] - a[1])
@@ -108,6 +110,7 @@ function getRandomWorlds() {
     })
     return str
 }
+
 // Gem functions are taken from StileDevs/GrowServer; thanks <3
 function splitGemsDrop(totalGems) {
     // List of gems limit. 1 for normal gems and 10 for red gems.
@@ -346,7 +349,7 @@ server.setHandler("receive", async (peer, packet) => {
                 peer.send(Pogtopia.TextPacket.from(3, "action|log", "msg|Welcome to GTJS!"))
                 peer.send(Pogtopia.Variant.from(
                     "OnRequestWorldSelectMenu",
-                    `add_heading|Top Worlds|\n${getRandomWorlds()}`
+                    `add_heading|Top Worlds|\n${await getRandomWorlds()}`
                 ))
                 peer.send(Pogtopia.Variant.from(
                     "OnConsoleMessage",
@@ -404,7 +407,7 @@ server.setHandler("receive", async (peer, packet) => {
                 peer.leave()
                 peer.send(Pogtopia.Variant.from(
                     "OnRequestWorldSelectMenu",
-                    `add_heading|Top Worlds|\n${getRandomWorlds()}`
+                    `add_heading|Top Worlds|\n${await getRandomWorlds()}`
                 ))
                 peer.send(Pogtopia.Variant.from(
                     "OnConsoleMessage", 
@@ -599,7 +602,7 @@ server.setHandler("receive", async (peer, packet) => {
                     await peer.leave()
                     peer.send(Pogtopia.Variant.from(
                         "OnRequestWorldSelectMenu",
-                        `add_heading|Top Worlds|\n${getRandomWorlds()}`
+                        `add_heading|Top Worlds|\n${await getRandomWorlds()}`
                     ))
                     peer.send(Pogtopia.Variant.from(
                         "OnConsoleMessage",
