@@ -99,6 +99,7 @@ async function getRandomWorlds() {
         if (p.data.currentWorld != "EXIT" && p.data.currentWorld != "") {
             let players = worlds.has(p.data.currentWorld) ? worlds.get(p.data.currentWorld) + 1 : 1
             worlds.set(p.data.currentWorld, players)
+            console.log(worlds)
         }
     })
     let sorted = Object.entries(worlds).sort((a, b) => b[1] - a[1])
