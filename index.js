@@ -84,6 +84,7 @@ let items = [{
     "value": 0,"value2": 0
 }]
 items = JSON.parse(fs.readFileSync("items.json", "utf-8")).items
+
 async function getOnlinePlayerCount() {
     let p = 0
     await server.forEach("player", () => {
@@ -92,7 +93,21 @@ async function getOnlinePlayerCount() {
     return p               
 }
 
-
+function getRandomWorlds() {
+    let worlds = new Map()
+    server.forEach("player", (p) => {
+        if (p.data.currentWorld != "EXIT" && p.data.currentWorld != "") {
+            worlds.set(p.data.currentWorld, worlds.has(p.data.currentWorld) ? worlds.get(p.data.currentWorld) : 0)
+        }
+    })
+    let sorted = Object.entries(worlds).sort((a, b) => b[1] - a[1])
+    sorted.slice(0, 8)
+    let str = ""
+    sorted.forEach(([world, players]) => {
+        str += `add_floater|${world} (${players})|0|0.5|3529161471\n`
+    })
+    return str
+}
 // Gem functions are taken from StileDevs/GrowServer; thanks <3
 function splitGemsDrop(totalGems) {
     // List of gems limit. 1 for normal gems and 10 for red gems.
@@ -331,7 +346,7 @@ server.setHandler("receive", async (peer, packet) => {
                 peer.send(Pogtopia.TextPacket.from(3, "action|log", "msg|Welcome to GTJS!"))
                 peer.send(Pogtopia.Variant.from(
                     "OnRequestWorldSelectMenu",
-                    `add_heading|Top Worlds|\nadd_floater|START|0|0.5|3529161471\nadd_floater|START1|0|0.5|3529161471\nadd_floater|BRBFR|0|0.5|3529161471`
+                    `add_heading|Top Worlds|\n${getRandomWorlds()}`
                 ))
                 peer.send(Pogtopia.Variant.from(
                     "OnConsoleMessage",
@@ -390,7 +405,7 @@ server.setHandler("receive", async (peer, packet) => {
                 peer.leave()
                 peer.send(Pogtopia.Variant.from(
                     "OnRequestWorldSelectMenu",
-                    `add_heading|Top Worlds|\nadd_floater|START|0|0.5|3529161471\nadd_floater|START1|0|0.5|3529161471\nadd_floater|BRBFR|0|0.5|3529161471`
+                    `add_heading|Top Worlds|\n${getRandomWorlds()}`
                 ))
                 peer.send(Pogtopia.Variant.from(
                     "OnConsoleMessage", 
@@ -401,7 +416,8 @@ server.setHandler("receive", async (peer, packet) => {
                 if (peer.data.displayName.startsWith("@")) {
                     //peer.data.displayName = "`8" + peer.data.displayName // Dev player color => Soon
                 }
-                await peer.join(data.get("name"))
+                let name = [...data.get("name").split(" ")][0]
+                await peer.join(name)
                 await peer.inventory()
                 let world = Pogtopia.World.create(server, data.get("name").toUpperCase())
                 await world.fetch(false)
@@ -521,7 +537,11 @@ server.setHandler("receive", async (peer, packet) => {
                                             buffer.writeFloatLE(1, 20)
                                             world.data.droppedItems = dItems
                                             await world.saveToCache()
-                                            peer.send(buffer)
+					    server.forEach("player", async (c) => {
+						if (c.data.currentWorld == peer.data.currentWorld) {
+	                                            c.send(buffer)
+						}
+					    })
                                         }
                                     }
                                     else if (tile.fg == 6){
@@ -580,7 +600,7 @@ server.setHandler("receive", async (peer, packet) => {
                     await peer.leave()
                     peer.send(Pogtopia.Variant.from(
                         "OnRequestWorldSelectMenu",
-                        `add_heading|Top Worlds|\nadd_floater|START|0|0.5|3529161471\nadd_floater|START1|0|0.5|3529161471\nadd_floater|BRBFR|0|0.5|3529161471`
+                        `add_heading|Top Worlds|\n${getRandomWorlds()}`
                     ))
                     peer.send(Pogtopia.Variant.from(
                         "OnConsoleMessage",
@@ -636,7 +656,7 @@ server.setHandler("receive", async (peer, packet) => {
                     world.data.droppedItems.forEach(async (itemD, index) => {
                         if (itemD.uid == tank.data.itemInfo) {
                             item = itemD
-                            world.data.droppedItems.splice(tank.data.itemInfo - 1, 1)
+                            itemD = {id: 0, amount: 0, uid: itemD.uid, x: -1, y: -1}
                             await world.saveToCache()
                         }
                     })
@@ -655,7 +675,6 @@ server.setHandler("receive", async (peer, packet) => {
                             }
                         }
                     })
-                    
                     break
                 }
                 
