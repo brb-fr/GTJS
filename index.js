@@ -1,4 +1,4 @@
-import { DialogBuilder } from "./DialogBuilder.ts"
+import { DialogBuilder } from "./DialogBuilder.js"
 import { TankPacket } from "growtopia.js"
 import Pogtopia from "pogtopia"
 import * as fs from "fs"
@@ -353,9 +353,8 @@ server.setHandler("receive", async (peer, packet) => {
                     `Where would you like to go? \`w(${await getOnlinePlayerCount()} online)`
                 ))
                 let dialog = new DialogBuilder()
-                dialog.addLabelWithIcon("GTJS", 18, "big")
+                dialog.addLabelWithIcon("`wGTJS", 18, "big")
                 dialog.addSpacer("small")
-                dialog.defaultColor()
                 dialog.addTextBox("Welcome to GTJS, thank you for using this open-source service!")
                 dialog.addTextBox("Github: `2https://github.com/brb-fr/GTJS")
                 dialog.addSpacer("small")
