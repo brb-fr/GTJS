@@ -96,11 +96,9 @@ async function getOnlinePlayerCount() {
 async function getRandomWorlds() {
     let worlds = new Map()
     server.forEach("player", async (p) => {
-        if (!p.hasPlayerData()) {return}
         if (p.data.currentWorld != "EXIT" && p.data.currentWorld != "") {
-            let w = Pogtopia.World.create(server, p.data.currentWorld)
-            await w.fetch(false)
-            worlds.set(p.data.currentWorld, w.data.playerCount)
+            let players = worlds.has(p.data.currentWorld) ? worlds.get(p.data.currentWorld) + 1 : 1
+            worlds.set(p.data.currentWorld, players)
         }
     })
     let sorted = Object.entries(worlds).sort((a, b) => b[1] - a[1])
