@@ -102,7 +102,7 @@ async function getRandomWorlds() {
             console.log(worlds)
         }
     })
-    let sorted = Object.entries(worlds).sort((a, b) => b[1] - a[1])
+    let sorted = Array.from(worlds.entries()).sort((a, b) => b[1] - a[1])
     sorted.slice(0, 8)
     let str = ""
     sorted.forEach(([world, players]) => {
@@ -251,7 +251,7 @@ server.setHandler("receive", async (peer, packet) => {
     let data = server.stringPacketToMap(packet)
     const isGuest = !data.has("tankIDName")
     const uid = isGuest ? data.get("rid"): data.get("tankIDName").toLowerCase()
-    //console.log(`${packet.readInt32LE()}: ${data.get("action")}`)
+    console.log(`${packet.readInt32LE()}: ${data.get("action")}`)
     switch (packet.readInt32LE()) {
         case 2: {
             if (data.has("requestedName")) {
@@ -402,6 +402,11 @@ server.setHandler("receive", async (peer, packet) => {
             if(data.get("action") == "quit") {
                 peer.leave()
                 await peer.disconnect("later")
+            }
+            if (data.get("action") == "validate_world") {
+                let w = Pogtopia.World.create(server, data.get("name")) 
+                await w.fetch(false)
+                await peer.send(Pogtopia.TextPacket.from("action|world_validated\navailable|" + w.hasData() ? 1 : 0))
             }
             if(data.get("action") == "quit_to_exit") {
                 peer.leave()
@@ -685,9 +690,11 @@ server.setHandler("receive", async (peer, packet) => {
         }
     }
 })
+
 server.setHandler("connect", (peer) => {
     peer.requestLoginInformation()
 })
+
 server.setHandler("disconnect", async (peer) => {
     await peer.leave(true)
     peer.disconnect("now")
