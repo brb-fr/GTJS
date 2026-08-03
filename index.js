@@ -95,18 +95,17 @@ async function getOnlinePlayerCount() {
 
 async function getRandomWorlds() {
     let worlds = new Map()
-    server.forEach("player", async (p) => {
-        if (p.data.currentWorld != "EXIT" && p.data.currentWorld != "") {
+    worlds.set("START", 0)
+    await server.forEach("player", async (p) => {
+        if (p.data.currentWorld && p.data.currentWorld != "EXIT") {
             let players = worlds.has(p.data.currentWorld) ? worlds.get(p.data.currentWorld) + 1 : 1
             worlds.set(p.data.currentWorld, players)
-            console.log(worlds)
         }
     })
-    let sorted = Array.from(worlds.entries()).sort((a, b) => b[1] - a[1])
-    sorted.slice(0, 8)
+    let sorted = Array.from(worlds.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8)
     let str = ""
     sorted.forEach(([world, players]) => {
-        str += `add_floater|${world} (${players})|0|0.5|3529161471\n`
+        str += `add_floater|${world}|${players}|0.5|3529161471\n`
     })
     return str
 }
@@ -402,11 +401,15 @@ server.setHandler("receive", async (peer, packet) => {
             if(data.get("action") == "quit") {
                 peer.leave()
                 await peer.disconnect("later")
+                break
             }
             if (data.get("action") == "validate_world") {
+                break // For some reason it didn't work
                 let w = Pogtopia.World.create(server, data.get("name")) 
                 await w.fetch(false)
-                await peer.send(Pogtopia.TextPacket.from("action|world_validated\navailable|" + w.hasData() ? 1 : 0))
+                console.log(data)
+                await peer.send(Pogtopia.TextPacket.from(3, "action|world_validated", `available|1`))
+                break
             }
             if(data.get("action") == "quit_to_exit") {
                 peer.leave()
@@ -418,6 +421,7 @@ server.setHandler("receive", async (peer, packet) => {
                     "OnConsoleMessage", 
                     `Where would you like to go? \`w(${await getOnlinePlayerCount()} online)`
                 ))
+                break
             }
             if (data.get("action") == "join_request") {
                 if (peer.data.displayName.startsWith("@")) {
@@ -442,6 +446,7 @@ server.setHandler("receive", async (peer, packet) => {
                     buffer.writeFloatLE(item.amount, 20)
                     await peer.send(buffer)
                 })
+                break
             }
         }
         break
@@ -544,11 +549,11 @@ server.setHandler("receive", async (peer, packet) => {
                                             buffer.writeFloatLE(1, 20)
                                             world.data.droppedItems = dItems
                                             await world.saveToCache()
-					    server.forEach("player", async (c) => {
-						if (c.data.currentWorld == peer.data.currentWorld) {
-	                                            c.send(buffer)
-						}
-					    })
+                                            server.forEach("player", async (c) => {
+                                            if (c.data.currentWorld == peer.data.currentWorld) {
+                                                c.send(buffer)
+                                            }
+                                            })
                                         }
                                     }
                                     else if (tile.fg == 6){
