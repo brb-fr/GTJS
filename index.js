@@ -227,7 +227,6 @@ const server = new Pogtopia.Server({
     }
 })
 let httpserver = http.createServer((req, res) => {
-    console.log(req.url)
     if (req.method == "GET" || req.method == "POST") {
         if (req.url == "/growtopia/server_data.php") {
             res.writeHead(200, {"Content-Type": "text/plain"})
@@ -286,6 +285,7 @@ server.setHandler("receive", async (peer, packet) => {
                                     {amount: 1, id: 32},
                                     {amount: 200, id: 2},
                                     {amount: 200, id: 8},
+                                    {amount: 200, id: 1618},
                                 ]
                             }
                         }, true)
@@ -466,7 +466,7 @@ server.setHandler("receive", async (peer, packet) => {
                             if (!(tile.fg == 0 && tile.bg == 0)) {
                                 if (tile.x == tank.data.playerPunchX && tile.y == tank.data.playerPunchY) {
                                     if (!(tile.fg == 6 || tile.fg == 8) || peer.data.displayName=="brbfr") {
-                                        let item = {}
+                                        let item = items[0]
                                         if (tile.fg == 0) {
                                             item = items[tile.bg]
                                         }
@@ -490,7 +490,9 @@ server.setHandler("receive", async (peer, packet) => {
                                         }, item.restoreTime * 1000, index)
                                         tile.resetAfterTimeout = time[Symbol.toPrimitive]()
                                         await world.saveToCache()
+                                        let broken = false
                                         if (tile.hitsTaken >= (item.breakHits)) {
+                                            broken = true
                                             t.data.type = 3
                                             t.data.info = 18
                                             tile.hitsTaken = 0
@@ -513,9 +515,9 @@ server.setHandler("receive", async (peer, packet) => {
                                             }
                                         })
                                         const rand = Math.random()
-                                        let dItems = world.data.droppedItems  || []
-                                        const xPos = Math.floor((tank.data.playerPunchX * 32) + (Math.random() * 16))
-                                        const yPos = Math.floor((tank.data.playerPunchY * 32) + (Math.random() * 16))
+                                        let dItems = world.data.droppedItems || []
+                                        let xPos = Math.floor((tank.data.playerPunchX * 32) + (Math.random() * 16))
+                                        let yPos = Math.floor((tank.data.playerPunchY * 32) + (Math.random() * 16))
                                         let tpbs = TankPacket.from({
                                             type: 14,
                                             netID: -1,
@@ -524,36 +526,73 @@ server.setHandler("receive", async (peer, packet) => {
                                             xPos,
                                             yPos
                                         })
-                                        if (rand <= 0.11) {
-                                            dItems.push({
-                                                id: destroyedItemID,
-                                                x: xPos,
-                                                y: yPos,
-                                                amount: 1,
-                                                uid: world.data.droppedItems.length + 1
-                                            })
-                                            tpbs.data.info = destroyedItemID
+                                        let gems = []
+                                        if (broken) {
+                                            if (rand <= 0.11) {
+                                                dItems.push({
+                                                    id: destroyedItemID,
+                                                    x: xPos,
+                                                    y: yPos,
+                                                    amount: 1,
+                                                    uid: world.data.droppedItems.length + 1
+                                                })
+                                                tpbs.data.info = destroyedItemID
+                                            }
+                                            else if (rand <= 0.29){
+                                                dItems.push({
+                                                    id: destroyedItemID + 1,
+                                                    x: xPos,
+                                                    y: yPos,
+                                                    amount: 1,
+                                                    uid: world.data.droppedItems.length + 1
+                                                })
+                                                tpbs.data.info = destroyedItemID + 1
+                                            }
+                                            else {
+                                                gems = splitGemsDrop(randomizeGemsDrop(item.rarity )) 
+                                                if (gems == []) {
+                                                    gems = [0]
+                                                }
+                                                gems.forEach(async (gem) => {
+                                                    const xPos = await Math.floor((tank.data.playerPunchX * 32) + (Math.random() * 16))
+                                                    const yPos = await Math.floor((tank.data.playerPunchY * 32) + (Math.random() * 16))
+                                                    tpbs = TankPacket.from({
+                                                        type: 14,
+                                                        netID: -1,
+                                                        targetNetID: -1,
+                                                        info: 112,
+                                                        xPos,
+                                                        yPos
+                                                    })
+                                                    dItems.push({
+                                                        id: 112,
+                                                        x: xPos,
+                                                        y: yPos,
+                                                        amount: gem,
+                                                        uid: world.data.droppedItems.length + 1
+                                                    })
+                                                    let buffer = tpbs.parse()
+                                                    buffer.writeFloatLE(gem, 20)
+                                                    server.forEach("player", (c) => {
+                                                        if (c.data.currentWorld == peer.data.currentWorld) {
+                                                            c.send(buffer)
+                                                        }
+                                                    })
+                                                })
+                                            }
                                         }
-                                        else if (rand <= 0.33){
-                                            dItems.push({
-                                                id: destroyedItemID + 1,
-                                                x: xPos,
-                                                y: yPos,
-                                                amount: 1,
-                                                uid: world.data.droppedItems.length + 1
-                                            })
-                                            tpbs.data.info = destroyedItemID + 1
-                                        }
-                                        if (tpbs.data.info != 0){
-                                            let buffer = tpbs.parse()
-                                            buffer.writeFloatLE(1, 20)
+                                        let buffer = tpbs.parse()
+                                        if (tpbs.data.info != 0 && tpbs.data.info != 1){
+                                            if (rand <= 0.29){
+                                                buffer.writeFloatLE(1, 20)
+                                                server.forEach("player", async (c) => {
+                                                    if (c.data.currentWorld == peer.data.currentWorld) {
+                                                        await c.send(buffer)
+                                                    }
+                                                })
+                                            }
                                             world.data.droppedItems = dItems
                                             await world.saveToCache()
-                                            server.forEach("player", async (c) => {
-                                            if (c.data.currentWorld == peer.data.currentWorld) {
-                                                c.send(buffer)
-                                            }
-                                            })
                                         }
                                     }
                                     else if (tile.fg == 6){
@@ -661,17 +700,17 @@ server.setHandler("receive", async (peer, packet) => {
                 }
                 case 11: {
                     let tank2 = TankPacket.fromBuffer(packet)
-                    console.log("NEW ITEM ", tank2)
                     let world = Pogtopia.World.create(server, peer.data.currentWorld)
                     await world.fetch(false)
                     let item = world.data.droppedItems[0]
                     world.data.droppedItems.forEach(async (itemD, index) => {
                         if (itemD.uid == tank.data.itemInfo) {
                             item = itemD
-                            itemD = {id: 0, amount: 0, uid: itemD.uid, x: -1, y: -1}
+                            world.data.droppedItems[index] = {id: 0, amount: 0, uid: itemD.uid, x: -1, y: -1}
                             await world.saveToCache()
                         }
                     })
+                    if (!item) { break }
                     peer.add_item_to_inventory(item.id, item.amount)
                     const collectPkt = new TankPacket({
                         type: 14,
