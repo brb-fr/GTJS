@@ -18,4 +18,4 @@ Make sure to disable a service to access port 80.
 `sudo node index.js`
 
 # Tests
-Tested working on Windows and Android with Growtopia version 3.36.
+Tested working on Windows and Android with Growtopia version 3.36-3.64.
